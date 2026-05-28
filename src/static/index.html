@@ -106,8 +106,9 @@
 
                 <!-- Modernization & Audit Dashboard -->
                 <div class="dashboard-card card" id="dashboard-panel">
-                    <div class="card-header">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <h2>Modernization &amp; Audit Dashboard</h2>
+                        <button class="btn-expand-panel" id="btn-expand-dash" title="Toggle Full Height">⤢</button>
                     </div>
                     <div class="dashboard-body">
                         <!-- Score metrics -->
@@ -150,7 +151,7 @@
 
                 <!-- Interactive Migration Agent -->
                 <div class="agent-card card" id="agent-panel">
-                    <div class="card-header agent-card-header">
+                    <div class="card-header agent-card-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <div class="agent-title-group">
                             <h2>Interactive Migration Agent</h2>
                             <div class="llm-health-row">
@@ -159,9 +160,12 @@
                                 <span id="llm-model-name" class="llm-model-name"></span>
                             </div>
                         </div>
-                        <button id="btn-restart-llm" class="btn btn-warning btn-sm" title="Restart Foundry LLM service" style="display:none;">
-                            ↺ Restart LLM
-                        </button>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button id="btn-restart-llm" class="btn btn-warning btn-sm" title="Restart Foundry LLM service" style="display:none;">
+                                ↺ Restart LLM
+                            </button>
+                            <button class="btn-expand-panel" id="btn-expand-agent" title="Toggle Full Height">⤢</button>
+                        </div>
                     </div>
                     <div id="llm-offline-banner" class="llm-offline-banner" style="display:none;">
                         <span>⚠ LLM offline — answers will use rule-based fallback.</span>

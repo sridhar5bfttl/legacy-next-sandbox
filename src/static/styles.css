@@ -883,3 +883,25 @@ body {
 .btn-warning:active:not(:disabled) {
     transform: translateY(0);
 }
+
+.btn-expand-panel {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: 8px;
+    transition: color 0.2s;
+    line-height: 1;
+}
+.btn-expand-panel:hover {
+    color: var(--color-text);
+}
+.panel-maximized {
+    height: 100% !important;
+    flex: 1 1 auto !important;
+}
+.panel-collapsed {
+    display: none !important;
+}

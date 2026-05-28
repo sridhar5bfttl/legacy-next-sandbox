@@ -18,6 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const findingsContainer = document.getElementById('findings-container');
     const sandboxStatus = document.getElementById('sandbox-status');
     const btnExpandOutput = document.getElementById('btn-expand-output');
+    
+    // Chat DOM Elements
+    const chatInput = document.getElementById('chat-input');
+    const btnSendChat = document.getElementById('btn-send-chat');
+    const chatHistory = document.getElementById('chat-history');
+    
+    let messageHistory = [];
 
     // ── Drag-to-Resize: Dashboard ↕ Agent panels ─────────────────────────
     (function initResizablePanels() {
@@ -90,6 +97,55 @@ document.addEventListener('DOMContentLoaded', () => {
             const totalH = container.clientHeight - 10;
             dashPanel.style.height = Math.round(totalH * 0.40) + 'px';
             localStorage.removeItem('ln-dash-height');
+        });
+    })();
+
+    // ── Expand/Collapse Dashboard & Agent Panels ────────────────────────────
+    (function initPanelExpanders() {
+        const btnExpandDash = document.getElementById('btn-expand-dash');
+        const btnExpandAgent = document.getElementById('btn-expand-agent');
+        const dashPanel = document.getElementById('dashboard-panel');
+        const agentPanel = document.getElementById('agent-panel');
+        const handle = document.getElementById('resize-handle');
+
+        if (!btnExpandDash || !btnExpandAgent || !dashPanel || !agentPanel || !handle) return;
+
+        function togglePanel(panelToExpand, panelToCollapse, btn) {
+            const isMaximized = panelToExpand.classList.contains('panel-maximized');
+            
+            if (isMaximized) {
+                // Restore
+                panelToExpand.classList.remove('panel-maximized');
+                panelToCollapse.classList.remove('panel-collapsed');
+                handle.classList.remove('panel-collapsed');
+                btn.innerText = '⤢';
+                btn.title = 'Toggle Full Height';
+                
+                // For dashPanel, we restore its height style if it was removed
+                if (panelToExpand === dashPanel) {
+                    const savedDash = localStorage.getItem('ln-dash-height');
+                    if (savedDash) dashPanel.style.height = savedDash + 'px';
+                }
+            } else {
+                // Maximize
+                panelToExpand.classList.add('panel-maximized');
+                panelToCollapse.classList.add('panel-collapsed');
+                handle.classList.add('panel-collapsed');
+                btn.innerText = '⤡';
+                btn.title = 'Restore Split View';
+                
+                if (panelToExpand === dashPanel) {
+                    dashPanel.style.height = 'auto'; // allow flex to take over
+                }
+            }
+        }
+
+        btnExpandDash.addEventListener('click', () => {
+            togglePanel(dashPanel, agentPanel, btnExpandDash);
+        });
+
+        btnExpandAgent.addEventListener('click', () => {
+            togglePanel(agentPanel, dashPanel, btnExpandAgent);
         });
     })();
 
@@ -529,8 +585,26 @@ C     COMPUTE NEXT STEP (SIMPLIFIED PRESSURE CORRECTION)
         dot.className = `status-dot ${color}`;
     }
 
+    if (btnSendChat) {
+        btnSendChat.addEventListener('click', () => {
+            const text = chatInput.value.trim();
+            if (text) {
+                sendMessage(text);
+                chatInput.value = '';
+            }
+        });
+    }
 
-    // Add user message to UI
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                btnSendChat.click();
+            }
+        });
+    }
+
+    async function sendMessage(text) {
+        // Add user message to UI
         appendMessage('user', text);
         messageHistory.push({ role: 'user', content: text });
 
