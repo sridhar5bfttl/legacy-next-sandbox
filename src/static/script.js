@@ -26,79 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let messageHistory = [];
 
-    // ── Drag-to-Resize: Dashboard ↕ Agent panels ─────────────────────────
-    (function initResizablePanels() {
-        const handle       = document.getElementById('resize-handle');
-        const dashPanel    = document.getElementById('dashboard-panel');
-        const agentPanel   = document.getElementById('agent-panel');
-        const container    = document.getElementById('resizable-panels');
 
-        if (!handle || !dashPanel || !agentPanel || !container) return;
-
-        const MIN_DASH  = 120;  // px minimum for dashboard
-        const MIN_AGENT = 120;  // px minimum for agent
-
-        // Restore saved heights from last session
-        const savedDash = localStorage.getItem('ln-dash-height');
-        if (savedDash) {
-            dashPanel.style.height  = savedDash + 'px';
-            dashPanel.style.flex    = '0 0 auto';
-        } else {
-            // Set sensible default split: 40% dashboard / 60% agent
-            const totalH = container.clientHeight - 10; // minus handle
-            dashPanel.style.height = Math.round(totalH * 0.40) + 'px';
-            dashPanel.style.flex   = '0 0 auto';
-        }
-
-        let dragging    = false;
-        let startY      = 0;
-        let startDashH  = 0;
-
-        function onDragStart(e) {
-            dragging   = true;
-            startY     = (e.touches ? e.touches[0].clientY : e.clientY);
-            startDashH = dashPanel.getBoundingClientRect().height;
-            handle.classList.add('dragging');
-            document.body.style.cursor    = 'ns-resize';
-            document.body.style.userSelect = 'none';
-            e.preventDefault();
-        }
-
-        function onDragMove(e) {
-            if (!dragging) return;
-            const clientY  = e.touches ? e.touches[0].clientY : e.clientY;
-            const delta    = clientY - startY;
-            const containerH = container.clientHeight - 10;
-            const maxDash  = containerH - MIN_AGENT;
-            const newDash  = Math.min(maxDash, Math.max(MIN_DASH, startDashH + delta));
-            dashPanel.style.height = newDash + 'px';
-            e.preventDefault();
-        }
-
-        function onDragEnd() {
-            if (!dragging) return;
-            dragging = false;
-            handle.classList.remove('dragging');
-            document.body.style.cursor     = '';
-            document.body.style.userSelect = '';
-            // Persist for next session
-            localStorage.setItem('ln-dash-height', Math.round(dashPanel.getBoundingClientRect().height));
-        }
-
-        handle.addEventListener('mousedown',  onDragStart, { passive: false });
-        handle.addEventListener('touchstart', onDragStart, { passive: false });
-        document.addEventListener('mousemove',  onDragMove,  { passive: false });
-        document.addEventListener('touchmove',  onDragMove,  { passive: false });
-        document.addEventListener('mouseup',    onDragEnd);
-        document.addEventListener('touchend',   onDragEnd);
-
-        // Double-click to reset to default 40/60 split
-        handle.addEventListener('dblclick', () => {
-            const totalH = container.clientHeight - 10;
-            dashPanel.style.height = Math.round(totalH * 0.40) + 'px';
-            localStorage.removeItem('ln-dash-height');
-        });
-    })();
 
     // ── Expand/Collapse Dashboard & Agent Panels ────────────────────────────
     (function initPanelExpanders() {
@@ -106,9 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const btnExpandAgent = document.getElementById('btn-expand-agent');
         const dashPanel = document.getElementById('dashboard-panel');
         const agentPanel = document.getElementById('agent-panel');
-        const handle = document.getElementById('resize-handle');
 
-        if (!btnExpandDash || !btnExpandAgent || !dashPanel || !agentPanel || !handle) return;
+        if (!btnExpandDash || !btnExpandAgent || !dashPanel || !agentPanel) return;
 
         function togglePanel(panelToExpand, panelToCollapse, btn) {
             const isMaximized = panelToExpand.classList.contains('panel-maximized');
@@ -117,26 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Restore
                 panelToExpand.classList.remove('panel-maximized');
                 panelToCollapse.classList.remove('panel-collapsed');
-                handle.classList.remove('panel-collapsed');
+                panelToExpand.style.width = '';
+                panelToExpand.style.left = '';
                 btn.innerText = '⤢';
                 btn.title = 'Toggle Full Height';
-                
-                // For dashPanel, we restore its height style if it was removed
-                if (panelToExpand === dashPanel) {
-                    const savedDash = localStorage.getItem('ln-dash-height');
-                    if (savedDash) dashPanel.style.height = savedDash + 'px';
-                }
             } else {
                 // Maximize
+                const rect = panelToExpand.getBoundingClientRect();
+                panelToExpand.style.width = rect.width + 'px';
+                panelToExpand.style.left = rect.left + 'px';
+                
                 panelToExpand.classList.add('panel-maximized');
                 panelToCollapse.classList.add('panel-collapsed');
-                handle.classList.add('panel-collapsed');
                 btn.innerText = '⤡';
                 btn.title = 'Restore Split View';
-                
-                if (panelToExpand === dashPanel) {
-                    dashPanel.style.height = 'auto'; // allow flex to take over
-                }
             }
         }
 

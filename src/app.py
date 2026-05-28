@@ -176,57 +176,73 @@ def run_and_compare():
         modern_compile_err = f"Transpilation / compilation exception: {str(e)}"
 
     # --- SCORE EVALUATION ---
-    # Build dynamic mock report for score evaluation based on whether it compiled
-    has_unmet_gaps = "U" if "CICS" in fortran_code or "registry" in fortran_code else "E"
+    # Build dynamic assessment based on code features
+    code_upper = fortran_code.upper()
+    has_unmet_gaps = "U" if "CICS" in code_upper or "REGISTRY" in code_upper else "E"
+    
+    # Syntax & Semantics
+    syntax_items = [{
+        "element": "Variable declarations (INTEGER/REAL)",
+        "match_level": "E",
+        "rationale": "Numeric types mapped to C++ standard variables.",
+        "target_equivalent": "int, double"
+    }]
+    if "DIMENSION" in code_upper:
+        syntax_items.append({
+            "element": "DIMENSION array allocations",
+            "match_level": "M",
+            "rationale": "Fortran arrays are 1-indexed; Eigen is 0-indexed column-major.",
+            "target_equivalent": "Eigen::Matrix<double, ..., ColMajor>"
+        })
+
+    # Architecture & State
+    arch_items = [{
+        "element": "PROGRAM / SUBROUTINE layout",
+        "match_level": "E",
+        "rationale": "Subprograms mapped to separate functional blocks.",
+        "target_equivalent": "C++ functions"
+    }]
+    if "COMMON" in code_upper:
+        arch_items.append({
+            "element": "COMMON blocks global sharing",
+            "match_level": "M",
+            "rationale": "Global common block variables grouped into struct scopes.",
+            "target_equivalent": "C++ global structs"
+        })
+
+    # Dependencies & Libraries
+    dep_items = []
+    if "DO " in code_upper:
+        dep_items.append({
+            "element": "Numerical solver nested DO loops",
+            "match_level": "E",
+            "rationale": "Matrix solver loops mapped to C++ loops.",
+            "target_equivalent": "for loops"
+        })
+    else:
+        dep_items.append({
+            "element": "Basic control flow",
+            "match_level": "E",
+            "rationale": "Sequential execution mapped directly.",
+            "target_equivalent": "C++ statements"
+        })
+
+    # Runtime & Integration
+    runtime_items = [{
+        "element": "System Call Output (WRITE/PRINT)",
+        "match_level": has_unmet_gaps,
+        "rationale": "System terminal bindings handled natively.",
+        "target_equivalent": "std::format / std::cout"
+    }]
     
     mock_assessment = {
         "module_name": "custom_sim.f",
         "target_technology": "Python + C++20 / Eigen",
         "assessments": {
-            "syntax_and_semantics": [
-                {
-                    "element": "Variable declarations (INTEGER/REAL)",
-                    "match_level": "E",
-                    "rationale": "Numeric types mapped to C++ standard variables.",
-                    "target_equivalent": "int, double"
-                },
-                {
-                    "element": "DIMENSION array allocations",
-                    "match_level": "M",
-                    "rationale": "Fortran arrays are 1-indexed; Eigen is 0-indexed column-major.",
-                    "target_equivalent": "Eigen::Matrix<double, ..., ColMajor>"
-                }
-            ],
-            "architecture_and_state": [
-                {
-                    "element": "PROGRAM / SUBROUTINE layout",
-                    "match_level": "E",
-                    "rationale": "Subprograms mapped to separate functional blocks.",
-                    "target_equivalent": "C++ functions"
-                },
-                {
-                    "element": "COMMON blocks global sharing",
-                    "match_level": "M",
-                    "rationale": "Global common block variables grouped into struct scopes.",
-                    "target_equivalent": "C++ global structs"
-                }
-            ],
-            "dependencies_and_libraries": [
-                {
-                    "element": "Numerical solver nested DO loops",
-                    "match_level": "E",
-                    "rationale": "Matrix solver loops mapped to C++ loops.",
-                    "target_equivalent": "for loops"
-                }
-            ],
-            "runtime_and_integration": [
-                {
-                    "element": "System Call Output (WRITE)",
-                    "match_level": has_unmet_gaps,
-                    "rationale": "System terminal bindings handled natively.",
-                    "target_equivalent": "std::format / std::cout"
-                }
-            ]
+            "syntax_and_semantics": syntax_items,
+            "architecture_and_state": arch_items,
+            "dependencies_and_libraries": dep_items,
+            "runtime_and_integration": runtime_items
         }
     }
     
