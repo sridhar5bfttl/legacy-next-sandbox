@@ -538,6 +538,23 @@ C     COMPUTE NEXT STEP (SIMPLIFIED PRESSURE CORRECTION)
         const typingIndicator = appendTypingIndicator();
         chatHistory.scrollTop = chatHistory.scrollHeight;
 
+        function setLlmState(isOnline, source, error) {
+            const statusBadge = document.getElementById('agent-status');
+            if (statusBadge) {
+                if (isOnline) {
+                    statusBadge.innerText = 'online (' + source + ')';
+                    statusBadge.className = 'badge success';
+                    statusBadge.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+                    statusBadge.style.color = '#10b981';
+                } else {
+                    statusBadge.innerText = 'offline (rule-based)';
+                    statusBadge.className = 'badge warning';
+                    statusBadge.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                    statusBadge.style.color = '#ef4444';
+                }
+            }
+        }
+
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -550,24 +567,65 @@ C     COMPUTE NEXT STEP (SIMPLIFIED PRESSURE CORRECTION)
                     modern_stdout: modernStdout.innerText
                 })
             });
-            const data = await response.json();
-            
             // Remove indicator
             typingIndicator.remove();
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            
+            // Create a temporary live bubble for streaming
+            const liveBubble = document.createElement('div');
+            liveBubble.className = 'chat-message assistant';
+            chatHistory.appendChild(liveBubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
 
-            if (data.reply) {
-                appendMessage('assistant', data.reply);
-                messageHistory.push({ role: 'assistant', content: data.reply });
+            let fullContent = "";
+            let finalSource = "";
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.substring(6).trim();
+                        if (dataStr === '[DONE]') {
+                            break;
+                        }
+                        try {
+                            const dataObj = JSON.parse(dataStr);
+                            if (dataObj.reply_chunk) {
+                                fullContent += dataObj.reply_chunk;
+                                liveBubble.innerHTML = marked.parse(fullContent);
+                                chatHistory.scrollTop = chatHistory.scrollHeight;
+                            }
+                            if (dataObj.source) {
+                                finalSource = dataObj.source;
+                            }
+                        } catch (e) {
+                            // ignore parse errors for partial chunks
+                        }
+                    }
+                }
+            }
+            
+            // Swap live bubble with fully formatted bubble (with apply buttons)
+            liveBubble.remove();
+            
+            if (fullContent) {
+                appendMessage('assistant', fullContent);
+                messageHistory.push({ role: 'assistant', content: fullContent });
 
                 // Sync health indicator with what the backend actually used
-                const src = data.source || 'offline';
-                if (src === 'foundry.local') {
+                if (finalSource.includes('foundry')) {
                     setLlmState(true, 'foundry.local', null);
-                } else if (src === 'local-ollama') {
-                    setLlmState(true, 'local-ollama', null);
-                } else {
-                    // rule-based-fallback means LLM was unreachable
+                } else if (finalSource.includes('offline')) {
                     setLlmState(false, 'offline', null);
+                } else {
+                    setLlmState(true, finalSource, null); // For Gemini API
                 }
             } else {
                 appendMessage('assistant', 'Error: Received empty response from translation advisor.');

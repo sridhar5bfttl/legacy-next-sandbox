@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Flask web server framework
-RUN pip install --no-cache-dir flask
+# Install Flask web server framework and Gemini SDK
+RUN pip install --no-cache-dir flask requests google-genai
 
 # Copy backend engines and static web resources
 COPY src/app.py /app/app.py

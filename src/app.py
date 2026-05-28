@@ -291,10 +291,15 @@ def run_and_compare():
 
 @app.route('/api/llm-status', methods=['GET'])
 def llm_status():
-    """Probe foundry.local and return LLM health info."""
+    """Probe for Gemini API key first, then fallback to local daemon."""
     import urllib.request
     import urllib.error
 
+    # 1. Cloud-Native Managed LLM
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return jsonify({"online": True, "source": "Gemini Cloud API", "model": "gemini-2.5-flash"})
+
+    # 2. Local Fallback LLMs
     foundry_host = "foundry.local:5273"
     ollama_host  = "foundry.local:11434"
 
@@ -316,7 +321,8 @@ def llm_status():
     if ollama["online"]:
         return jsonify({"online": True, "source": "local-ollama", "model": ollama["model"]})
 
-    return jsonify({"online": False, "source": "offline", "model": None})
+    # 3. Rule-Based Fallback
+    return jsonify({"online": False, "source": "offline (rule-based)", "model": None})
 
 
 @app.route('/api/llm-restart', methods=['POST'])
@@ -393,7 +399,7 @@ def chat():
     import urllib.error
     
     foundry_host = "foundry.local:5273"
-    model_name = "qwen2.5-coder-7b-instruct-generic-gpu"  # Default fallback (overridden by /v1/models discovery)
+    model_name = "Phi-3.5-mini-instruct-generic-gpu"  # Default fallback
     
     try:
         # Fetch active models from foundry to dynamically match the loaded model
@@ -401,9 +407,15 @@ def chat():
         with urllib.request.urlopen(req_models, timeout=3) as res_models:
             models_data = json.loads(res_models.read().decode('utf-8'))
             if models_data and "data" in models_data and len(models_data["data"]) > 0:
-                model_name = models_data["data"][0]["id"]
+                # Prefer Phi if available to avoid heavy GPU hang from Qwen 7B
+                available_models = [m["id"] for m in models_data["data"]]
+                for m in available_models:
+                    if "phi" in m.lower():
+                        model_name = m
+                        break
+                else:
+                    model_name = available_models[0]
     except Exception:
-        # Fall back to default model name if models endpoint is offline
         pass
 
     # Format messages to prepend the system prompt context to the first user message,
@@ -434,103 +446,118 @@ def chat():
         "model": model_name,
         "messages": formatted_messages,
         "temperature": 0.2,
-        "max_tokens": 4096
+        "max_tokens": 4096,
+        "stream": True
     }
 
-    try:
-        req = urllib.request.Request(
-            f"http://{foundry_host}/v1/chat/completions",
-            data=json.dumps(payload).encode('utf-8'),
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-        # 180-second timeout to allow local model generation
-        with urllib.request.urlopen(req, timeout=180) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            reply = res_data["choices"][0]["message"]["content"]
-            return jsonify({"reply": reply, "source": "foundry.local"})
-    except Exception as e_foundry:
-        app.logger.error(f"Foundry connection failed: {e_foundry}")
-        import traceback
-        traceback.print_exc()
-        # 2. Try standard local Ollama port on host machine (fallback)
-        ollama_host = "foundry.local:11434"
-        try:
-            ollama_model = "qwen2.5-coder"  # default fallback
-            try:
-                req_ollama_models = urllib.request.Request(f"http://{ollama_host}/v1/models", method="GET")
-                with urllib.request.urlopen(req_ollama_models, timeout=5) as res_ollama_models:
-                    ollama_models_data = json.loads(res_ollama_models.read().decode('utf-8'))
-                    if ollama_models_data and "data" in ollama_models_data and len(ollama_models_data["data"]) > 0:
-                        ollama_model = ollama_models_data["data"][0]["id"]
-            except Exception:
-                pass
+    from flask import Response
 
-            payload_ollama = {
-                "model": ollama_model,
-                "messages": formatted_messages,
-                "temperature": 0.2,
-                "max_tokens": 4096
-            }
-            req_ollama = urllib.request.Request(
-                f"http://{ollama_host}/v1/chat/completions",
-                data=json.dumps(payload_ollama).encode('utf-8'),
+    def generate():
+        # 0. Cloud-Native Managed LLM (Gemini API)
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if gemini_key:
+            try:
+                from google import genai
+                from google.genai import types
+                
+                client = genai.Client(api_key=gemini_key)
+                
+                gemini_contents = []
+                for msg in formatted_messages:
+                    role = "user" if msg["role"] == "user" else "model"
+                    if msg["role"] == "system":
+                        role = "user" # Gemini expects system instructions in config
+                    gemini_contents.append(
+                        types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])])
+                    )
+                    
+                response_stream = client.models.generate_content_stream(
+                    model='gemini-2.5-flash',
+                    contents=gemini_contents,
+                    config=types.GenerateContentConfig(
+                        temperature=0.2,
+                        max_output_tokens=4096,
+                    )
+                )
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield f"data: {json.dumps({'reply_chunk': chunk.text, 'source': 'Gemini Cloud API'})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+            except Exception as e_gemini:
+                app.logger.error(f"Gemini API failed: {e_gemini}")
+
+        # 1. Local Foundry (Streaming)
+        try:
+            req = urllib.request.Request(
+                f"http://{foundry_host}/v1/chat/completions",
+                data=json.dumps(payload).encode('utf-8'),
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req_ollama, timeout=180) as response:
-                res_data = json.loads(response.read().decode('utf-8'))
-                reply = res_data["choices"][0]["message"]["content"]
-                return jsonify({"reply": reply, "source": "local-ollama"})
-        except Exception as e_ollama:
-            app.logger.error(f"Ollama fallback failed: {e_ollama}")
-            traceback.print_exc()
-            # 3. Fallback to local rule-based helper if no local LLM daemon is running
-            last_user_msg = messages[-1]["content"].lower()
+            with urllib.request.urlopen(req, timeout=180) as response:
+                for line in response:
+                    line_str = line.decode('utf-8').strip()
+                    if line_str.startswith('data: ') and line_str != 'data: [DONE]':
+                        try:
+                            chunk_data = json.loads(line_str[6:])
+                            delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                            if "content" in delta:
+                                yield f"data: {json.dumps({'reply_chunk': delta['content'], 'source': 'foundry.local'})}\n\n"
+                        except Exception:
+                            pass
+            yield "data: [DONE]\n\n"
+            return
+        except Exception as e_foundry:
+            app.logger.error(f"Foundry connection failed: {e_foundry}")
             
-            # Simple rule-based expert answer generation as fallback
-            if "common" in last_user_msg or "block" in last_user_msg:
-                reply = (
-                    "### COMMON Block Migration Analysis\n\n"
-                    "In Fortran, `COMMON` blocks like `COMMON /SIMPARAM/ DX, DY, DT, REYNOLDS` share mutable global state across files and subroutines.\n\n"
-                    "* **The C++ Translation**: We grouped these parameters into a named global struct scope (`SIMPARAM`).\n"
-                    "* **Best Practice Refactoring**: Global mutable structs are a thread-safety hazard. For multi-threaded production runs, we recommend refactoring the code to:\n"
-                    "  1. Wrap parameters into a clean config struct (e.g., `SimParams`).\n"
-                    "  2. Pass it by const reference `const SimParams& params` to your simulation routines."
-                )
-            elif "index" in last_user_msg or "dimension" in last_user_msg or "offset" in last_user_msg:
-                reply = (
-                    "### Array Index Shifting & Memory Layout\n\n"
-                    "Fortran uses 1-based indexing (`1` to `N`), whereas C++ is 0-based (`0` to `N-1`).\n\n"
-                    "* **Transpilation Rules**: The parser maps every index access like `U(I, J)` to `U(I-1, J-1)`. C++ math formulas evaluate terms like `I+1 - 1` directly to `I` at compile time.\n"
-                    "* **Storage Layout**: Enforcing column-major ordering (`Eigen::ColMajor`) is critical to ensure cache locality matches Fortran's contiguous column storage in memory."
-                )
-            elif "omp" in last_user_msg or "parallel" in last_user_msg or "loop" in last_user_msg:
-                reply = (
-                    "### Parallelization & OpenMP\n\n"
-                    "Fortran loops can be parallelized easily. In the transpiled C++ code, you can accelerate nested loops by adding **OpenMP directives**:\n"
-                    "```cpp\n"
-                    "#pragma omp parallel for collapse(2)\n"
-                    "for (int J = 2; J <= NY - 1; ++J) {\n"
-                    "    for (int I = 2; I <= NX - 1; ++I) {\n"
-                    "         // computation...\n"
-                    "    }\n"
-                    "}\n"
-                    "```\n"
-                    "Compile with `-fopenmp` (e.g., `g++ -fopenmp ...`) to unlock multi-core execution."
-                )
-            else:
-                reply = (
-                    "### LEGACY-NEXT Migration Advisor\n\n"
-                    "The local model endpoint at **http://foundry.local:5273** or **http://foundry.local:11434** appears offline.\n\n"
-                    "**Quick Summary of the Migration Gaps**:\n"
-                    "1. **COMMON Block**: Refactored to global struct (`SIMPARAM`) to mimic global scopes.\n"
-                    "2. **1-Indexed to 0-Indexed Array Shift**: Adjusted all grid mappings by `-1` offset.\n"
-                    "3. **Column-Major Configuration**: Set Eigen matrices to `Eigen::ColMajor` to prevent memory thrashing.\n\n"
-                    "Please start your local LLM daemon (Ollama/Foundry) or ask about **COMMON blocks**, **array indexing**, or **OpenMP parallelization** to trigger local rule-based expert analysis."
-                )
+        # 2. Offline rule-based fallback
+        last_user_msg = messages[-1]["content"].lower() if messages else ""
+        if "common" in last_user_msg or "block" in last_user_msg:
+            reply = (
+                "### COMMON Block Migration Analysis\n\n"
+                "In Fortran, `COMMON` blocks like `COMMON /SIMPARAM/ DX, DY, DT, REYNOLDS` share mutable global state across files and subroutines.\n\n"
+                "* **The C++ Translation**: We grouped these parameters into a named global struct scope (`SIMPARAM`).\n"
+                "* **Best Practice Refactoring**: Global mutable structs are a thread-safety hazard. For multi-threaded production runs, we recommend refactoring the code to:\n"
+                "  1. Wrap parameters into a clean config struct (e.g., `SimParams`).\n"
+                "  2. Pass it by const reference `const SimParams& params` to your simulation routines."
+            )
+        elif "index" in last_user_msg or "dimension" in last_user_msg or "offset" in last_user_msg:
+            reply = (
+                "### Array Index Shifting & Memory Layout\n\n"
+                "Fortran uses 1-based indexing (`1` to `N`), whereas C++ is 0-based (`0` to `N-1`).\n\n"
+                "* **Transpilation Rules**: The parser maps every index access like `U(I, J)` to `U(I-1, J-1)`. C++ math formulas evaluate terms like `I+1 - 1` directly to `I` at compile time.\n"
+                "* **Storage Layout**: Enforcing column-major ordering (`Eigen::ColMajor`) is critical to ensure cache locality matches Fortran's contiguous column storage in memory."
+            )
+        elif "omp" in last_user_msg or "parallel" in last_user_msg or "loop" in last_user_msg:
+            reply = (
+                "### Parallelization & OpenMP\n\n"
+                "Fortran loops can be parallelized easily. In the transpiled C++ code, you can accelerate nested loops by adding **OpenMP directives**:\n"
+                "```cpp\n"
+                "#pragma omp parallel for collapse(2)\n"
+                "for (int J = 2; J <= NY - 1; ++J) {\n"
+                "    for (int I = 2; I <= NX - 1; ++I) {\n"
+                "         // computation...\n"
+                "    }\n"
+                "}\n"
+                "```\n"
+                "Compile with `-fopenmp` (e.g., `g++ -fopenmp ...`) to unlock multi-core execution."
+            )
+        else:
+            reply = (
+                "### LEGACY-NEXT Migration Advisor\n\n"
+                "The local model endpoint at **http://foundry.local:5273** appears offline.\n\n"
+                "**Quick Summary of the Migration Gaps**:\n"
+                "1. **COMMON Block**: Refactored to global struct (`SIMPARAM`) to mimic global scopes.\n"
+                "2. **1-Indexed to 0-Indexed Array Shift**: Adjusted all grid mappings by `-1` offset.\n"
+                "3. **Column-Major Configuration**: Set Eigen matrices to `Eigen::ColMajor` to prevent memory thrashing.\n\n"
+                "Please start your local LLM daemon (Ollama/Foundry) or ask about **COMMON blocks**, **array indexing**, or **OpenMP parallelization** to trigger local rule-based expert analysis."
+            )
             
-            return jsonify({"reply": reply, "source": "rule-based-fallback"})
+        yield f"data: {json.dumps({'reply_chunk': reply, 'source': 'offline (rule-based)'})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     # Default Flask execution on port 8080
