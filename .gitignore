@@ -1,0 +1,22 @@
+# Compiled executables
+fluidsim_legacy
+fluidsim_modern
+*.o
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# OS
+.DS_Store
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/

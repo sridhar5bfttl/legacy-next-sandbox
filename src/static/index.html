@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEGACY-NEXT: Fortran Modernization Sandbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-container">
+                <span class="logo-icon">▲</span>
+                <h1>LEGACY-NEXT</h1>
+                <span class="badge">Fortran Sandbox</span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot green"></span>
+                <span id="sandbox-status">Sandbox Ready</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <main class="workspace-grid">
+            <!-- Left Panel: Input & Config -->
+            <section class="editor-section card">
+                <div class="card-header">
+                    <h2>Legacy Fortran Input</h2>
+                    <div class="sample-loader">
+                        <button id="btn-load-sample" class="btn btn-secondary btn-sm">Load FLUIDSIM.f Sample</button>
+                    </div>
+                </div>
+                
+                <div class="editor-container">
+                    <textarea id="fortran-editor" spellcheck="false" placeholder="Write or paste your Fortran 77/90 code here..."></textarea>
+                </div>
+
+                <div class="config-container">
+                    <h3>Customizable Parameters</h3>
+                    <p class="section-desc">These inputs were automatically detected in your code. Change them to run the simulation with custom configurations.</p>
+                    <div id="dynamic-inputs" class="inputs-grid">
+                        <p class="empty-inputs-msg">Load code or scan variables to customize inputs...</p>
+                    </div>
+                </div>
+
+                <div class="action-footer">
+                    <button id="btn-scan" class="btn btn-secondary">Scan Variables</button>
+                </div>
+            </section>
+
+            <!-- Center Panel: Transpilation Output -->
+            <section class="transpile-section card">
+                <div class="card-header">
+                    <h2>C++20 / Eigen Transpilation</h2>
+                    <button id="btn-transpile" class="btn btn-primary" disabled>
+                        <span>Transpile to C++</span>
+                    </button>
+                </div>
+                <div class="editor-container">
+                    <textarea id="cpp-editor" readonly placeholder="Your C++20 code will generate here..."></textarea>
+                </div>
+                <div class="action-footer">
+                    <button id="btn-run-all" class="btn btn-accent" disabled>Run & Compare Stack</button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Execution & Score -->
+            <section class="output-section">
+                <div class="output-toolbar">
+                    <button id="btn-expand-output" class="btn btn-secondary btn-sm" title="Toggle full-width view">
+                        <span id="expand-icon" style="font-weight:bold; margin-right:4px;">⤢</span> 
+                        <span id="expand-text">Expand View</span>
+                    </button>
+                </div>
+                <!-- Dual Terminals -->
+                <div class="terminals-grid">
+                    <div class="terminal-card card">
+                        <div class="terminal-header">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">Legacy gfortran Output</span>
+                        </div>
+                        <div class="terminal-body" id="legacy-stdout">
+                            <pre class="terminal-placeholder">Awaiting legacy compilation run...</pre>
+                        </div>
+                    </div>
+
+                    <div class="terminal-card card">
+                        <div class="terminal-header">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">Modern C++20 Output</span>
+                        </div>
+                        <div class="terminal-body" id="modern-stdout">
+                            <pre class="terminal-placeholder">Awaiting C++ execution run...</pre>
+                        </div>
+                    </div>
+                </div>                <!-- Resizable Dashboard + Agent panels -->
+                <div class="resizable-panels" id="resizable-panels">
+
+                <!-- Modernization & Audit Dashboard -->
+                <div class="dashboard-card card" id="dashboard-panel">
+                    <div class="card-header">
+                        <h2>Modernization &amp; Audit Dashboard</h2>
+                    </div>
+                    <div class="dashboard-body">
+                        <!-- Score metrics -->
+                        <div class="metric-group">
+                            <div class="radial-metric">
+                                <svg class="progress-ring" width="120" height="120">
+                                    <circle class="progress-ring-circle-bg" stroke="#1f2937" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                                    <circle class="progress-ring-circle" id="score-gauge" stroke="#10b981" stroke-width="8" fill="transparent" r="50" cx="60" cy="60" stroke-dasharray="314.15" stroke-dashoffset="314.15"/>
+                                </svg>
+                                <div class="gauge-value" id="score-text">0%</div>
+                                <span class="gauge-label">Confidence Score</span>
+                            </div>
+
+                            <div class="status-cards">
+                                <div class="status-card" id="match-status-card">
+                                    <span class="card-lbl">Execution Output Match</span>
+                                    <span class="card-val" id="match-status">Awaiting Run</span>
+                                </div>
+                                <div class="status-card">
+                                    <span class="card-lbl">Risk Profile</span>
+                                    <span class="card-val" id="risk-profile">No Assessment</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary explanation -->
+                        <div class="summary-details">
+                            <h3>Findings Summary</h3>
+                            <div class="findings-log" id="findings-container">
+                                <p class="placeholder-text">Please upload code and run the comparison to generate detailed audit findings.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drag Handle -->
+                <div class="resize-handle" id="resize-handle" title="Drag to resize">
+                    <div class="resize-grip"></div>
+                </div>
+
+                <!-- Interactive Migration Agent -->
+                <div class="agent-card card" id="agent-panel">
+                    <div class="card-header agent-card-header">
+                        <div class="agent-title-group">
+                            <h2>Interactive Migration Agent</h2>
+                            <div class="llm-health-row">
+                                <span id="llm-health-dot" class="llm-health-dot offline" title="LLM Status"></span>
+                                <span id="agent-status" class="badge">checking...</span>
+                                <span id="llm-model-name" class="llm-model-name"></span>
+                            </div>
+                        </div>
+                        <button id="btn-restart-llm" class="btn btn-warning btn-sm" title="Restart Foundry LLM service" style="display:none;">
+                            ↺ Restart LLM
+                        </button>
+                    </div>
+                    <div id="llm-offline-banner" class="llm-offline-banner" style="display:none;">
+                        <span>⚠ LLM offline — answers will use rule-based fallback.</span>
+                        <button id="btn-retry-llm" class="btn btn-warning btn-sm">↺ Retry</button>
+                    </div>
+                    <div class="agent-body">
+                        <div id="chat-history" class="chat-history">
+                            <div class="chat-message assistant">
+                                <div class="msg-bubble">
+                                    Hello! I am your LEGACY-NEXT migration advisor. Ask me questions about the transpiled C++ code, compilation logs, array layouts, or shared state.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-row">
+                            <input type="text" id="chat-input" placeholder="Ask about array indexing, COMMON blocks, OpenMP, etc..." autocomplete="off">
+                            <button id="btn-send-chat" class="btn btn-accent btn-sm">Send</button>
+                        </div>
+                    </div>
+                </div>
+
+                </div><!-- /resizable-panels -->
+            </section>
+        </main>
+    </div>
+    <script src="script.js?v=2"></script>
+</body>
+</html>

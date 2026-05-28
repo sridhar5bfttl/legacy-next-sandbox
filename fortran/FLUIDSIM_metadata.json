@@ -1,0 +1,51 @@
+{
+  "module_name": "FLUIDSIM.f",
+  "language": "Fortran 77",
+  "metrics": {
+    "total_lines": 55,
+    "has_database_calls": false,
+    "has_file_io": false,
+    "has_ui_elements": false
+  },
+  "variables": [
+    {
+      "name": "NX, NY, I, J, STEPS",
+      "type": "INTEGER",
+      "description": "Grid dimensions, loops, and iteration counters"
+    },
+    {
+      "name": "U, V, P",
+      "type": "REAL array DIMENSION(NX, NY)",
+      "description": "Fluid velocity components (U, V) and pressure grid (P)"
+    },
+    {
+      "name": "DX, DY, DT, REYNOLDS",
+      "type": "REAL (COMMON /SIMPARAM/)",
+      "description": "Physical simulation properties shared across routines"
+    }
+  ],
+  "procedures_and_routines": [
+    {
+      "name": "FLUIDSIM",
+      "complexity": "Medium",
+      "description": "Main program entry point initializing grid, running simulation loops, and writing output."
+    },
+    {
+      "name": "SOLVER",
+      "complexity": "Medium",
+      "description": "Subroutine executing finite-difference grid velocity updates."
+    }
+  ],
+  "external_dependencies": [
+    {
+      "name": "SIMPARAM",
+      "type": "COMMON Block",
+      "details": "Global state sharing block containing DX, DY, DT, and REYNOLDS variables"
+    },
+    {
+      "name": "WRITE(*, 9000)",
+      "type": "System Call",
+      "details": "Scientific console output stream formatting"
+    }
+  ]
+}

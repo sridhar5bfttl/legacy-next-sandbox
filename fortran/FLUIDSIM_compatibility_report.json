@@ -1,0 +1,50 @@
+{
+  "module_name": "FLUIDSIM.f",
+  "target_technology": "Python + C++20 / Eigen",
+  "assessments": {
+    "syntax_and_semantics": [
+      {
+        "element": "Variable declarations (INTEGER/REAL)",
+        "match_level": "E",
+        "rationale": "Standard numeric types have direct native representations in modern stacks.",
+        "target_equivalent": "C++ standard types (int, double)"
+      },
+      {
+        "element": "DIMENSION 1-indexed column-major matrix arrays (U, V, P)",
+        "match_level": "M",
+        "rationale": "Fortran arrays are 1-indexed and column-major. Modern C++ matrices (Eigen) are 0-indexed and default to row-major, requiring index shift refactoring and explicit ColMajor configuration.",
+        "target_equivalent": "Eigen::Matrix<double, Dynamic, Dynamic, Eigen::ColMajor>"
+      }
+    ],
+    "architecture_and_state": [
+      {
+        "element": "PROGRAM / SUBROUTINE logical layout",
+        "match_level": "E",
+        "rationale": "Procedural main block and subprograms map directly to functions or static methods.",
+        "target_equivalent": "C++ main() and stand-alone helper functions"
+      },
+      {
+        "element": "COMMON /SIMPARAM/ blocks global state",
+        "match_level": "M",
+        "rationale": "Global variables must be encapsulated to avoid concurrency race conditions in modern multi-threaded architectures.",
+        "target_equivalent": "C++ Struct / Configuration Singleton class passed by reference"
+      }
+    ],
+    "dependencies_and_libraries": [
+      {
+        "element": "Numerical solver nested DO loops",
+        "match_level": "E",
+        "rationale": "Finite difference computation loops map directly to loops or optimized vectorized linear algebra libraries.",
+        "target_equivalent": "Eigen matrix calculations / OpenMP parallel for loops"
+      }
+    ],
+    "runtime_and_integration": [
+      {
+        "element": "FORMAT scientific console output (WRITE 9000)",
+        "match_level": "E",
+        "rationale": "Fixed-width scientific float outputs map cleanly to modern string interpolation.",
+        "target_equivalent": "std::format / std::cout"
+      }
+    ]
+  }
+}
