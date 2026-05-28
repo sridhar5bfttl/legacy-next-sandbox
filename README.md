@@ -1,5 +1,7 @@
 # LEGACY-NEXT: Legacy-to-Modern Software Compatibility & Translation Framework
 
+**🌍 Live Demo:** [https://legacy-next-sandbox-1000479190734.us-central1.run.app](https://legacy-next-sandbox-1000479190734.us-central1.run.app)
+
 ## 1. Executive Summary & Overview
 Legacy systems represent years of business logic, optimization, and institutional knowledge. However, maintaining obsolete technologies introduces significant technical debt, security vulnerabilities, and a talent shortage. 
 
@@ -220,3 +222,5 @@ The assessment dimensions and scoring models in `LEGACY-NEXT` are grounded in th
     *   Introduces standard execution-based evaluation benchmarks (HumanEval, pass@k) showing that execution accuracy and unit tests are the only true measures of semantic equivalence.
     *   *CodeBLEU: a Method for Automatic Evaluation of Code Synthesis* (Ren et al., Microsoft Research) | [arXiv:2009.10297](https://arxiv.org/abs/2009.10297)
     *   Establishes the industry standard for scoring code synthesis using Abstract Syntax Trees (AST) and Data-Flow analysis.
+
+
